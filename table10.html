@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Table 1 Menu - Royal Hotel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .menu-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .header {
+            background: #2c1810;
+            color: #ffd966;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .table-info {
+            background: #ffd966;
+            color: #2c1810;
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 25px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .cart-bar {
+            background: #f0f0f0;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .cart-count {
+            background: #d4a373;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .view-cart-btn {
+            background: #2c1810;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .menu-section {
+            padding: 20px;
+            max-height: 550px;
+            overflow-y: auto;
+        }
+
+        .category {
+            margin-bottom: 25px;
+        }
+
+        .category h2 {
+            color: #d4a373;
+            margin-bottom: 15px;
+            border-left: 4px solid #d4a373;
+            padding-left: 12px;
+        }
+
+        .menu-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #fef9f0;
+            border-radius: 15px;
+            transition: transform 0.2s;
+        }
+
+        .menu-item:hover {
+            transform: translateX(5px);
+        }
+
+        .item-info {
+            flex: 1;
+        }
+
+        .item-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c1810;
+        }
+
+        .item-desc {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        .item-price {
+            color: #d4a373;
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 5px;
+        }
+
+        .item-actions {
+            text-align: right;
+        }
+
+        .add-btn {
+            background: #d4a373;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .add-btn:hover {
+            background: #b86f2c;
+        }
+
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .qty-btn {
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .qty-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .qty {
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        /* Cart Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 500px;
+            border-radius: 20px;
+            max-height: 80%;
+            overflow: auto;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            background: #2c1810;
+            color: #ffd966;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close {
+            font-size: 28px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .close:hover {
+            color: #ffd966;
+        }
+
+        .cart-items {
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .cart-total {
+            padding: 20px;
+            border-top: 2px solid #ddd;
+            font-weight: bold;
+            font-size: 20px;
+            text-align: right;
+            background: #f9f9f9;
+        }
+
+        .place-order-btn {
+            background: #d4a373;
+            color: white;
+            border: none;
+            padding: 15px;
+            width: 100%;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .place-order-btn:hover {
+            background: #b86f2c;
+        }
+
+        .success-msg {
+            background: #4caf50;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 480px) {
+            .menu-item {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .item-actions {
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="menu-container">
+        <div class="header">
+            <h1>🍽️ Royal Hotel</h1>
+            <div class="table-info">Table 1</div>
+        </div>
+        
+        <div class="cart-bar">
+            <span>🛒 Your Cart</span>
+            <div>
+                <span class="cart-count" id="cartCount">0</span>
+                <button class="view-cart-btn" onclick="openCart()">View Cart</button>
+            </div>
+        </div>
+
+        <div class="menu-section" id="menuSection"></div>
+    </div>
+
+    <!-- Cart Modal -->
+    <div id="cartModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🛍️ Your Order Summary</h2>
+                <span class="close" onclick="closeCart()">&times;</span>
+            </div>
+            <div id="cartItemsList" class="cart-items"></div>
+            <div id="cartTotal" class="cart-total"></div>
+            <button class="place-order-btn" onclick="placeOrder()">✅ Place Order Now</button>
+        </div>
+    </div>
+
+    <script>
+        const TABLE_NUMBER = 10;
+        let cart = [];
+
+        // Menu items
+        const menuItems = {
+            appetizers: [
+                { name: "Spring Rolls", price: 180, desc: "Crispy vegetable rolls with sweet chili sauce" },
+                { name: "Paneer Tikka", price: 250, desc: "Grilled cottage cheese with spices" },
+                { name: "Chicken Wings", price: 280, desc: "Spicy hot wings with dip" },
+                { name: "Veg Manchurian", price: 200, desc: "Crispy veg balls in Indo-Chinese sauce" }
+            ],
+            mainCourse: [
+                { name: "Butter Chicken", price: 350, desc: "Creamy tomato gravy with tender chicken" },
+                { name: "Paneer Butter Masala", price: 280, desc: "Rich cottage cheese curry" },
+                { name: "Veg Biryani", price: 220, desc: "Aromatic rice with vegetables & raita" },
+                { name: "Dal Makhani", price: 200, desc: "Black lentil delicacy slow-cooked" },
+                { name: "Chicken Biryani", price: 320, desc: "Fragrant basmati rice with chicken" }
+            ],
+            breads: [
+                { name: "Garlic Naan", price: 50, desc: "Soft bread with garlic butter" },
+                { name: "Butter Naan", price: 45, desc: "Classic butter naan" },
+                { name: "Tandoori Roti", price: 30, desc: "Whole wheat bread" },
+                { name: "Cheese Naan", price: 70, desc: "Stuffed with cheese" }
+            ],
+            desserts: [
+                { name: "Gulab Jamun", price: 90, desc: "Sweet milk dumplings (2 pcs)" },
+                { name: "Ice Cream", price: 120, desc: "Vanilla/Chocolate/Strawberry" },
+                { name: "Rasmalai", price: 110, desc: "Soft cheese patties in sweet milk" }
+            ],
+            beverages: [
+                { name: "Soft Drink", price: 60, desc: "Coke/Pepsi/7UP (330ml)" },
+                { name: "Fresh Lime Soda", price: 80, desc: "Sweet/Salt/Mint" },
+                { name: "Masala Chai", price: 40, desc: "Indian spiced tea" },
+                { name: "Fresh Juice", price: 120, desc: "Orange/Mango/Watermelon" }
+            ]
+        };
+
+        // Render menu
+        function renderMenu() {
+            const menuSection = document.getElementById('menuSection');
+            menuSection.innerHTML = '';
+
+            for (const [category, items] of Object.entries(menuItems)) {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'category';
+                
+                let categoryIcon = '🍽️';
+                if (category === 'appetizers') categoryIcon = '🍢';
+                else if (category === 'mainCourse') categoryIcon = '🍛';
+                else if (category === 'breads') categoryIcon = '🥖';
+                else if (category === 'desserts') categoryIcon = '🍨';
+                else if (category === 'beverages') categoryIcon = '🥤';
+                
+                categoryDiv.innerHTML = `<h2>${categoryIcon} ${category.toUpperCase()}</h2>`;
+                
+                items.forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'menu-item';
+                    
+                    const cartItem = cart.find(c => c.name === item.name);
+                    const quantity = cartItem ? cartItem.quantity : 0;
+                    
+                    itemDiv.innerHTML = `
+                        <div class="item-info">
+                            <div class="item-name">${item.name}</div>
+                            <div class="item-desc">${item.desc}</div>
+                            <div class="item-price">₹${item.price}</div>
+                        </div>
+                        <div class="item-actions">
+                            ${quantity > 0 ? `
+                                <div class="quantity-control">
+                                    <button class="qty-btn" onclick="updateQuantity('${item.name}', ${item.price}, -1)">-</button>
+                                    <span class="qty">${quantity}</span>
+                                    <button class="qty-btn" onclick="updateQuantity('${item.name}', ${item.price}, 1)">+</button>
+                                </div>
+                            ` : `
+                                <button class="add-btn" onclick="addToCart('${item.name}', ${item.price})">Add to Cart</button>
+                            `}
+                        </div>
+                    `;
+                    
+                    categoryDiv.appendChild(itemDiv);
+                });
+                
+                menuSection.appendChild(categoryDiv);
+            }
+        }
+
+        // Add to cart
+        function addToCart(name, price) {
+            const existing = cart.find(item => item.name === name);
+            if (existing) {
+                existing.quantity++;
+            } else {
+                cart.push({ name, price, quantity: 1 });
+            }
+            updateCartUI();
+            renderMenu();
+            showNotification(`Added ${name} to cart`, 'success');
+        }
+
+        // Update quantity
+        function updateQuantity(name, price, change) {
+            const existing = cart.find(item => item.name === name);
+            if (existing) {
+                existing.quantity += change;
+                if (existing.quantity <= 0) {
+                    cart = cart.filter(item => item.name !== name);
+                }
+            }
+            updateCartUI();
+            renderMenu();
+        }
+
+        // Update cart UI
+        function updateCartUI() {
+            const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+            document.getElementById('cartCount').textContent = totalItems;
+        }
+
+        // Open cart modal
+        function openCart() {
+            const modal = document.getElementById('cartModal');
+            const cartItemsList = document.getElementById('cartItemsList');
+            const cartTotal = document.getElementById('cartTotal');
+            
+            if (cart.length === 0) {
+                cartItemsList.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">🛒 Your cart is empty<br>Add some delicious items from the menu!</div>';
+                cartTotal.innerHTML = '';
+            } else {
+                let html = '';
+                let total = 0;
+                cart.forEach((item, index) => {
+                    const itemTotal = item.price * item.quantity;
+                    total += itemTotal;
+                    html += `
+                        <div class="cart-item">
+                            <div>
+                                <strong>${item.name}</strong><br>
+                                <span style="font-size: 12px; color: #999;">₹${item.price} × ${item.quantity}</span>
+                            </div>
+                            <div>
+                                <strong>₹${itemTotal}</strong><br>
+                                <button onclick="updateQuantity('${item.name}', ${item.price}, -1)" style="background: #ff6b6b; color: white; border: none; padding: 2px 8px; border-radius: 5px; cursor: pointer; font-size: 10px;">Remove</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                cartItemsList.innerHTML = html;
+                cartTotal.innerHTML = `Total: ₹${total}`;
+            }
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeCart() {
+            document.getElementById('cartModal').style.display = 'none';
+        }
+
+        // Show notification
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.style.position = 'fixed';
+            notification.style.bottom = '20px';
+            notification.style.left = '50%';
+            notification.style.transform = 'translateX(-50%)';
+            notification.style.backgroundColor = type === 'success' ? '#4caf50' : '#ff6b6b';
+            notification.style.color = 'white';
+            notification.style.padding = '12px 24px';
+            notification.style.borderRadius = '8px';
+            notification.style.zIndex = '2000';
+            notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+            notification.style.fontWeight = 'bold';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 2000);
+        }
+
+        // Place order
+        function placeOrder() {
+            if (cart.length === 0) {
+                showNotification('Please add items to your cart first!', 'error');
+                return;
+            }
+
+            const orders = cart.map(item => ({
+                item: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                timestamp: Date.now()
+            }));
+
+            // Get existing orders for this table
+            const existingOrders = localStorage.getItem(`table_${TABLE_NUMBER}_orders`);
+            let allOrders = existingOrders ? JSON.parse(existingOrders) : [];
+            
+            // Add new orders
+            allOrders.push(...orders);
+            
+            // Save back to localStorage
+            localStorage.setItem(`table_${TABLE_NUMBER}_orders`, JSON.stringify(allOrders));
+            
+            // Clear cart
+            cart = [];
+            updateCartUI();
+            renderMenu();
+            closeCart();
+            
+            // Show success message
+            showNotification('✅ Order placed successfully! Your food will be served shortly.', 'success');
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('cartModal');
+            if (event.target === modal) {
+                closeCart();
+            }
+        }
+
+        // Initialize
+        renderMenu();
+        
+        // Make functions global
+        window.addToCart = addToCart;
+        window.updateQuantity = updateQuantity;
+        window.openCart = openCart;
+        window.closeCart = closeCart;
+        window.placeOrder = placeOrder;
+    </script>
+</body>
+</html>
