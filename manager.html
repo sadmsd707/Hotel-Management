@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Hotel Manager Dashboard - Live Orders</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -47,20 +49,17 @@
             font-weight: bold;
         }
 
-        .refresh-btn {
-            background: white;
-            color: #e67e22;
-            border: none;
-            padding: 8px 20px;
+        .connection-status {
+            background: #4CAF50;
+            color: white;
+            padding: 5px 15px;
             border-radius: 25px;
-            cursor: pointer;
-            font-weight: bold;
+            font-size: 12px;
             margin-left: 10px;
-            transition: all 0.2s;
         }
 
-        .refresh-btn:hover {
-            transform: scale(1.05);
+        .connection-status.offline {
+            background: #f44336;
         }
 
         .tables-grid {
@@ -95,27 +94,11 @@
             font-weight: bold;
         }
 
-        .qr-link {
-            background: white;
-            padding: 5px 12px;
-            border-radius: 8px;
-            color: #e67e22;
-            text-decoration: none;
-            font-size: 12px;
-            font-weight: bold;
-            display: inline-block;
-            transition: all 0.2s;
-        }
-
-        .qr-link:hover {
-            transform: scale(1.05);
-            background: #f39c12;
-            color: white;
-        }
-
         .orders-section {
             padding: 15px;
             min-height: 250px;
+            max-height: 400px;
+            overflow-y: auto;
             background: #fef9f0;
         }
 
@@ -126,6 +109,18 @@
             margin-bottom: 10px;
             border-radius: 8px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
         }
 
         .order-details {
@@ -153,6 +148,13 @@
             margin-top: 5px;
         }
 
+        .order-notes {
+            font-size: 11px;
+            color: #666;
+            margin-top: 3px;
+            font-style: italic;
+        }
+
         .empty-orders {
             text-align: center;
             color: #999;
@@ -177,6 +179,21 @@
         .clear-btn:hover {
             background: #e67e22;
             transform: scale(1.02);
+        }
+
+        .notification-badge {
+            background: #f44336;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 10px;
+            margin-left: 5px;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         .footer {
@@ -218,47 +235,115 @@
             <h1>🏨 Royal Hotel Management</h1>
             <div>
                 <span class="stats" id="liveStats">📊 Live Orders: 0</span>
-                <button class="refresh-btn" onclick="refreshDashboard()">🔄 Refresh</button>
+                <span class="connection-status" id="connectionStatus">
+                    <span id="statusIcon">🟢</span> Connected
+                </span>
             </div>
         </div>
 
         <div class="tables-grid" id="tablesGrid"></div>
         <div class="footer">
-            <p>📱 <strong>How to use:</strong> Print QR codes for each table using the URLs below</p>
-            <p>⚡ Orders appear automatically when customers place them from any device</p>
-            <p>💾 All orders are saved and will persist even after page refresh</p>
+            <p>📱 Orders appear in real-time from any device</p>
+            <p>💾 Data is securely stored in Firebase Cloud Database</p>
         </div>
     </div>
 
     <script>
-        // Initialize orders storage
-        let allOrders = {};
+        // REPLACE WITH YOUR FIREBASE CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyB_l4qu-i3T2JgHf7RN315lhU-KkJygbcU",
+            authDomain: "hotel-management-3fdd9.firebaseapp.com",
+            databaseURL: "https://hotel-management-3fdd9-default-rtdb.firebaseio.com/",
+            projectId: "hotel-management-3fdd9",
+            storageBucket: "hotel-management-3fdd9.firebasestorage.app",
+            messagingSenderId: "252267069879",
+            appId: "1:252267069879:web:6a70c511b6bd507953e832"
+        };
 
-        // Load saved orders from localStorage
-        function loadOrders() {
-            for (let i = 1; i <= 10; i++) {
-                const saved = localStorage.getItem(`table_${i}_orders`);
-                if (saved) {
-                    allOrders[i] = JSON.parse(saved);
-                } else {
-                    allOrders[i] = [];
-                }
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
+        // Store orders locally
+        const allOrders = {};
+        for (let i = 1; i <= 10; i++) {
+            allOrders[i] = [];
+        }
+
+        // Connection status
+        const connectedRef = database.ref('.info/connected');
+        connectedRef.on('value', (snap) => {
+            const statusElement = document.getElementById('connectionStatus');
+            const statusIcon = document.getElementById('statusIcon');
+            if (snap.val() === true) {
+                statusElement.className = 'connection-status';
+                statusIcon.textContent = '🟢';
+                statusElement.innerHTML = '<span id="statusIcon">🟢</span> Connected';
+            } else {
+                statusElement.className = 'connection-status offline';
+                statusIcon.textContent = '🔴';
+                statusElement.innerHTML = '<span id="statusIcon">🔴</span> Offline';
+            }
+        });
+
+        // Listen for real-time updates for all tables
+        function setupRealtimeListeners() {
+            for (let tableNum = 1; tableNum <= 10; tableNum++) {
+                const tableRef = database.ref(`tables/table_${tableNum}/orders`);
+                
+                tableRef.on('value', (snapshot) => {
+                    const orders = snapshot.val() || [];
+                    allOrders[tableNum] = Array.isArray(orders) ? orders : Object.values(orders);
+                    
+                    updateTableCard(tableNum);
+                    updateStats();
+                    
+                    if (window.initialLoadComplete) {
+                        showToast(`New order at Table ${tableNum}!`, 'success');
+                    }
+                });
+            }
+            window.initialLoadComplete = true;
+        }
+
+        // Update a single table card
+        function updateTableCard(tableNum) {
+            const orders = allOrders[tableNum] || [];
+            const ordersContainer = document.getElementById(`orders-table-${tableNum}`);
+            
+            if (!ordersContainer) {
+                renderDashboard();
+                return;
+            }
+            
+            const totalBill = orders.reduce((sum, order) => sum + (order.price * (order.quantity || 1)), 0);
+            const totalSpan = document.querySelector(`#table-header-${tableNum} .table-total`);
+            const countSpan = document.querySelector(`#table-header-${tableNum} .order-count`);
+            
+            if (totalSpan) totalSpan.textContent = `💰 ₹${totalBill}`;
+            if (countSpan) countSpan.textContent = `🛎️ Current Orders (${orders.length})`;
+            
+            ordersContainer.innerHTML = renderOrders(orders, tableNum);
+            
+            const clearBtnContainer = document.getElementById(`clear-btn-${tableNum}`);
+            if (clearBtnContainer) {
+                clearBtnContainer.innerHTML = orders.length > 0 ? 
+                    `<button class="clear-btn" onclick="clearOrders(${tableNum})">🗑️ Clear All Orders - Table ${tableNum}</button>` : '';
             }
         }
 
-        // Save orders for a specific table
-        function saveOrders(tableNum) {
-            localStorage.setItem(`table_${tableNum}_orders`, JSON.stringify(allOrders[tableNum]));
-        }
-
         // Clear orders for a table
-        function clearOrders(tableNum) {
-            if (confirm(`⚠️ Clear ALL orders for Table ${tableNum}? This cannot be undone.`)) {
-                allOrders[tableNum] = [];
-                saveOrders(tableNum);
-                renderDashboard();
-                updateStats();
+        async function clearOrders(tableNum) {
+            if (!confirm(`⚠️ Clear ALL orders for Table ${tableNum}? This cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                await database.ref(`tables/table_${tableNum}/orders`).set([]);
                 showToast(`Table ${tableNum} orders cleared!`, 'success');
+            } catch (error) {
+                console.error('Error clearing orders:', error);
+                showToast('Failed to clear orders', 'error');
             }
         }
 
@@ -269,26 +354,19 @@
                 total += allOrders[i].length;
             }
             document.getElementById('liveStats').innerHTML = `📊 Live Orders: ${total}`;
+            document.title = total > 0 ? `(${total}) Hotel Manager Dashboard` : 'Hotel Manager Dashboard';
         }
-
-        // Listen for storage changes (real-time updates from other tabs)
-        window.addEventListener('storage', function(e) {
-            if (e.key && e.key.includes('table_')) {
-                loadOrders();
-                renderDashboard();
-                updateStats();
-                showToast('New order received!', 'success');
-            }
-        });
 
         // Format time
         function formatTime(timestamp) {
+            if (!timestamp) return 'Just now';
             const date = new Date(timestamp);
             return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
         }
 
         // Format date
         function formatDate(timestamp) {
+            if (!timestamp) return '';
             const date = new Date(timestamp);
             return date.toLocaleDateString('en-IN');
         }
@@ -301,32 +379,31 @@
             for (let i = 1; i <= 10; i++) {
                 const orders = allOrders[i] || [];
                 const orderCount = orders.length;
-                
-                // Calculate total bill for this table
                 const totalBill = orders.reduce((sum, order) => sum + (order.price * (order.quantity || 1)), 0);
                 
                 const card = document.createElement('div');
                 card.className = 'table-card';
                 
                 card.innerHTML = `
-                    <div class="table-header">
+                    <div class="table-header" id="table-header-${i}">
                         <span class="table-number">🍽️ Table ${i}</span>
                         <div>
-                            <span style="background: rgba(255,255,255,0.2); padding: 5px 10px; border-radius: 8px; font-size: 12px; margin-right: 8px;">
+                            <span style="background: rgba(255,255,255,0.2); padding: 5px 10px; border-radius: 8px; font-size: 12px; margin-right: 8px;" class="table-total">
                                 💰 ₹${totalBill}
                             </span>
-                            <a href="table${i}.html" target="_blank" class="qr-link">📱 Open Menu</a>
                         </div>
                     </div>
                     <div class="orders-section">
                         <div style="margin-bottom: 10px; font-weight: bold; color: #2c1810; display: flex; justify-content: space-between;">
-                            <span>🛎️ Current Orders (${orderCount})</span>
+                            <span class="order-count">🛎️ Current Orders (${orderCount})</span>
                             <span style="font-size: 12px; color: #e67e22;">Total: ₹${totalBill}</span>
                         </div>
                         <div id="orders-table-${i}">
                             ${renderOrders(orders, i)}
                         </div>
-                        ${orderCount > 0 ? `<button class="clear-btn" onclick="clearOrders(${i})">🗑️ Clear All Orders - Table ${i}</button>` : ''}
+                        <div id="clear-btn-${i}">
+                            ${orderCount > 0 ? `<button class="clear-btn" onclick="clearOrders(${i})">🗑️ Clear All Orders - Table ${i}</button>` : ''}
+                        </div>
                     </div>
                 `;
                 
@@ -335,33 +412,33 @@
         }
 
         function renderOrders(orders, tableNum) {
-            if (orders.length === 0) {
-                return '<div class="empty-orders">✨ No orders yet<br>📱 Customer will see menu after scanning QR</div>';
+            if (!orders || orders.length === 0) {
+                return '<div class="empty-orders">✨ No orders yet</div>';
             }
             
+            const sortedOrders = [...orders].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            
             let html = '';
-            orders.forEach((order, idx) => {
+            sortedOrders.forEach((order) => {
                 const orderDate = formatDate(order.timestamp);
                 const orderTime = formatTime(order.timestamp);
+                const isNew = order.timestamp && (Date.now() - order.timestamp < 5000);
+                
                 html += `
-                    <div class="order-item">
+                    <div class="order-item" style="${isNew ? 'background: #fff3e0;' : ''}">
                         <div class="order-details">
-                            <span class="item-name">🍜 ${order.item}</span>
+                            <span class="item-name">
+                                🍜 ${order.item}
+                                ${isNew ? '<span class="notification-badge">NEW</span>' : ''}
+                            </span>
                             <span class="item-price">₹${order.price} × ${order.quantity || 1} = ₹${(order.price * (order.quantity || 1))}</span>
                         </div>
                         <div class="order-time">🕐 ${orderDate} at ${orderTime}</div>
+                        ${order.notes ? `<div class="order-notes">📝 ${order.notes}</div>` : ''}
                     </div>
                 `;
             });
             return html;
-        }
-
-        // Refresh dashboard manually
-        function refreshDashboard() {
-            loadOrders();
-            renderDashboard();
-            updateStats();
-            showToast('Dashboard refreshed!', 'success');
         }
 
         // Show toast notification
@@ -379,39 +456,24 @@
             toast.style.fontWeight = 'bold';
             toast.textContent = message;
             document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
-        // Check for new orders periodically
-        function checkForUpdates() {
-            let changed = false;
-            for (let i = 1; i <= 10; i++) {
-                const saved = localStorage.getItem(`table_${i}_orders`);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (JSON.stringify(parsed) !== JSON.stringify(allOrders[i])) {
-                        allOrders[i] = parsed;
-                        changed = true;
-                    }
-                }
-            }
-            if (changed) {
-                renderDashboard();
-                updateStats();
-            }
-        }
-
-        // Initial load
-        loadOrders();
+        // Initialize
+        setupRealtimeListeners();
         renderDashboard();
         updateStats();
         
-        // Check for updates every 2 seconds
-        setInterval(checkForUpdates, 2000);
-        
-        // Make functions global
         window.clearOrders = clearOrders;
-        window.refreshDashboard = refreshDashboard;
+
+        // Check Firebase config
+        if (firebaseConfig.apiKey === "AIzaSyB_l4qu-i3T2JgHf7RN315lhU-KkJygbcU") {
+            showToast('⚠️ Please update Firebase configuration!', 'error');
+        }
     </script>
 </body>
 </html>
