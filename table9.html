@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Table 1 Menu - Royal Hotel</title>
+    <title>Table 9 Menu - Royal Hotel</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <style>
         * {
             margin: 0;
@@ -32,6 +35,7 @@
             color: #ffd966;
             padding: 25px;
             text-align: center;
+            position: relative;
         }
 
         .header h1 {
@@ -47,6 +51,22 @@
             border-radius: 25px;
             margin-top: 10px;
             font-weight: bold;
+        }
+
+        .connection-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #4CAF50;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .connection-badge.offline {
+            background: #f44336;
         }
 
         .cart-bar {
@@ -271,13 +291,24 @@
             background: #b86f2c;
         }
 
-        .success-msg {
-            background: #4caf50;
-            color: white;
-            padding: 10px;
-            text-align: center;
-            border-radius: 8px;
-            margin-top: 10px;
+        .place-order-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         @media (max-width: 480px) {
@@ -295,8 +326,11 @@
 <body>
     <div class="menu-container">
         <div class="header">
+            <div class="connection-badge" id="connectionBadge">
+                <span id="connectionIcon">🟢</span> Live
+            </div>
             <h1>🍽️ Royal Hotel</h1>
-            <div class="table-info">Table 1</div>
+            <div class="table-info">Table 9</div>
         </div>
         
         <div class="cart-bar">
@@ -319,13 +353,46 @@
             </div>
             <div id="cartItemsList" class="cart-items"></div>
             <div id="cartTotal" class="cart-total"></div>
-            <button class="place-order-btn" onclick="placeOrder()">✅ Place Order Now</button>
+            <button class="place-order-btn" id="placeOrderBtn" onclick="placeOrder()">✅ Place Order Now</button>
         </div>
     </div>
 
     <script>
+        // REPLACE WITH YOUR FIREBASE CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyB_l4qu-i3T2JgHf7RN315lhU-KkJygbcU",
+            authDomain: "hotel-management-3fdd9.firebaseapp.com",
+            databaseURL: "https://hotel-management-3fdd9-default-rtdb.firebaseio.com",
+            projectId: "hotel-management-3fdd9",
+            storageBucket: "hotel-management-3fdd9.firebasestorage.app",
+            messagingSenderId: "252267069879",
+            appId: "1:252267069879:web:6a70c511b6bd507953e832"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        
         const TABLE_NUMBER = 9;
         let cart = [];
+        let isConnected = true;
+
+        // Monitor connection status
+        const connectedRef = database.ref('.info/connected');
+        connectedRef.on('value', (snap) => {
+            isConnected = snap.val() === true;
+            const badge = document.getElementById('connectionBadge');
+            const icon = document.getElementById('connectionIcon');
+            if (isConnected) {
+                badge.className = 'connection-badge';
+                icon.textContent = '🟢';
+                badge.innerHTML = '<span id="connectionIcon">🟢</span> Live';
+            } else {
+                badge.className = 'connection-badge offline';
+                icon.textContent = '🔴';
+                badge.innerHTML = '<span id="connectionIcon">🔴</span> Offline';
+            }
+        });
 
         // Menu items
         const menuItems = {
@@ -467,7 +534,7 @@
                             </div>
                             <div>
                                 <strong>₹${itemTotal}</strong><br>
-                                <button onclick="updateQuantity('${item.name}', ${item.price}, -1)" style="background: #ff6b6b; color: white; border: none; padding: 2px 8px; border-radius: 5px; cursor: pointer; font-size: 10px;">Remove</button>
+                                <button onclick="updateQuantity('${item.name}', ${item.price}, -${item.quantity})" style="background: #ff6b6b; color: white; border: none; padding: 2px 8px; border-radius: 5px; cursor: pointer; font-size: 10px;">Remove All</button>
                             </div>
                         </div>
                     `;
@@ -502,38 +569,83 @@
             setTimeout(() => notification.remove(), 2000);
         }
 
-        // Place order
-        function placeOrder() {
+        // Place order to Firebase
+        async function placeOrder() {
             if (cart.length === 0) {
                 showNotification('Please add items to your cart first!', 'error');
                 return;
             }
 
-            const orders = cart.map(item => ({
-                item: item.name,
-                price: item.price,
-                quantity: item.quantity,
-                timestamp: Date.now()
-            }));
+            if (!isConnected) {
+                showNotification('No internet connection. Please check your network.', 'error');
+                return;
+            }
 
-            // Get existing orders for this table
-            const existingOrders = localStorage.getItem(`table_${TABLE_NUMBER}_orders`);
-            let allOrders = existingOrders ? JSON.parse(existingOrders) : [];
-            
-            // Add new orders
-            allOrders.push(...orders);
-            
-            // Save back to localStorage
-            localStorage.setItem(`table_${TABLE_NUMBER}_orders`, JSON.stringify(allOrders));
-            
-            // Clear cart
-            cart = [];
-            updateCartUI();
-            renderMenu();
-            closeCart();
-            
-            // Show success message
-            showNotification('✅ Order placed successfully! Your food will be served shortly.', 'success');
+            const placeOrderBtn = document.getElementById('placeOrderBtn');
+            placeOrderBtn.disabled = true;
+            placeOrderBtn.innerHTML = 'Processing... <span class="loading-spinner"></span>';
+
+            try {
+                // Prepare orders with timestamp
+                const orders = cart.map(item => ({
+                    item: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                    timestamp: Date.now()
+                }));
+
+                // Get reference to table orders in Firebase
+                const tableOrdersRef = database.ref(`tables/table_${TABLE_NUMBER}/orders`);
+                
+                // Get current orders
+                const snapshot = await tableOrdersRef.once('value');
+                const currentOrders = snapshot.val() || [];
+                
+                // Add new orders to existing ones
+                const updatedOrders = [...currentOrders, ...orders];
+                
+                // Save to Firebase
+                await tableOrdersRef.set(updatedOrders);
+                
+                // Clear cart
+                cart = [];
+                updateCartUI();
+                renderMenu();
+                closeCart();
+                
+                // Show success message
+                showNotification('✅ Order placed successfully! Your food will be served shortly.', 'success');
+                
+                // Play success sound (optional)
+                playSuccessSound();
+                
+            } catch (error) {
+                console.error('Error placing order:', error);
+                showNotification('❌ Failed to place order. Please try again.', 'error');
+            } finally {
+                placeOrderBtn.disabled = false;
+                placeOrderBtn.innerHTML = '✅ Place Order Now';
+            }
+        }
+
+        // Play success sound
+        function playSuccessSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 800;
+                gainNode.gain.value = 0.1;
+                
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + 0.1);
+            } catch (e) {
+                // Audio not supported
+            }
         }
 
         // Close modal when clicking outside
@@ -553,6 +665,12 @@
         window.openCart = openCart;
         window.closeCart = closeCart;
         window.placeOrder = placeOrder;
+
+        // Check if Firebase config is set
+        if (firebaseConfig.apiKey === "AIzaSyB_l4qu-i3T2JgHf7RN315lhU-KkJygbcU") {
+            console.warn('⚠️ Please update Firebase configuration in the code!');
+            showNotification('⚠️ Firebase not configured. Please update settings.', 'error');
+        }
     </script>
 </body>
 </html>
